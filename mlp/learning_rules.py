@@ -73,53 +73,39 @@ class GradientDescentLearningRule(object):
             param -= self.learning_rate * grad
 
 
-class RMSpropLearningRule(GradientDescentLearningRule):
-    """Gradient descent with momentum learning rule.
-    This extends the basic gradient learning rule by introducing extra
-    momentum state variables for each parameter. These can help the learning
-    dynamic help overcome shallow local minima and speed convergence when
-    making multiple successive steps in a similar direction in parameter space.
-    For parameter p[i] and corresponding momentum m[i] the updates for a
-    scalar loss function `L` are of the form
-        m[i] := mom_coeff * m[i] - learning_rate * dL/dp[i]
-        p[i] := p[i] + m[i]
-    with `learning_rate` a positive scaling parameter for the gradient updates
-    and `mom_coeff` a value in [0, 1] that determines how much 'friction' there
-    is the system and so how quickly previous momentum contributions decay.
+class RMSPropLearningRule(GradientDescentLearningRule):
+    """Root mean squared gradient normalised learning rule (RMSProp).
+    First-order gradient-descent based learning rule which normalises gradient
+    updates by a exponentially smoothed estimate of the gradient second
+    moments.
+    References:
+      [1]: Neural Networks for Machine Learning: Lecture 6a slides
+           University of Toronto,Computer Science Course CSC321
+      http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf
     """
 
-    def __init__(self, learning_rate=1e-3, decay_rate=0.9, eps=1e-8):
+    def __init__(self, learning_rate=1e-3, beta=0.9, epsilon=1e-8):
         """Creates a new learning rule object.
         Args:
             learning_rate: A postive scalar to scale gradient updates to the
                 parameters by. This needs to be carefully set - if too large
                 the learning dynamic will be unstable and may diverge, while
                 if set too small learning will proceed very slowly.
-            mom_coeff: A scalar in the range [0, 1] inclusive. This determines
-                the contribution of the previous momentum value to the value
-                after each update. If equal to 0 the momentum is set to exactly
-                the negative scaled gradient each update and so this rule
-                collapses to standard gradient descent. If equal to 1 the
-                momentum will just be decremented by the scaled gradient at
-                each update. This is equivalent to simulating the dynamic in
-                a frictionless system. Due to energy conservation the loss
-                of 'potential energy' as the dynamics moves down the loss
-                function surface will lead to an increasingly large 'kinetic
-                energy' and so speed, meaning the updates will become
-                increasingly large, potentially unstably so. Typically a value
-                less than but close to 1 will avoid these issues and cause the
-                dynamic to converge to a local minima where the gradients are
-                by definition zero.
+            beta: Exponential decay rate for gradient second moment
+                estimates. This should be a scalar value in [0, 1]. The running
+                gradient second moment estimate is calculated using
+                `m_2 = beta * m_2_prev + (1 - beta) * g**2`
+                 where `m_2_prev` is the previous estimate and `g` the current
+                 parameter gradients.
+            epsilon: 'Softening' parameter to stop updates diverging when
+                gradient second moment estimates are close to zero. Should be
+                set to a small positive value.
         """
-        super(RMSpropLearningRule, self).__init__(learning_rate)
-        assert eps >= 1e-8 and eps <= 1e-4, (
-            'eps should be in the range [1e-8, 1e-4].'
-        )
-        self.eps = eps
-        assert decay_rate > 0., (
-            'decay_rate should be typical values like [0.9, 0.99, 0.999]'
-        )
-        self.decay_rate = decay_rate
+        super(RMSPropLearningRule, self).__init__(learning_rate)
+        assert beta >= 0. and beta <= 1., 'beta should be in [0, 1].'
+        assert epsilon > 0., 'epsilon should be > 0.'
+        self.beta = beta
+        self.epsilon = epsilon
 
     def initialise(self, params):
         """Initialises the state of the learning rule for a set or parameters.
@@ -129,17 +115,18 @@ class RMSpropLearningRule(GradientDescentLearningRule):
                 be updated *in-place* to avoid reallocating arrays on each
                 update.
         """
-        super(RMSpropLearningRule, self).initialise(params)
-        self.caches = []
+        super(RMSPropLearningRule, self).initialise(params)
+        self.moms_2 = []
         for param in self.params:
-            self.caches.append(np.zeros_like(param))
+            self.moms_2.append(np.zeros_like(param))
 
     def reset(self):
         """Resets any additional state variables to their initial values.
-        For this learning rule this corresponds to zeroing all the momenta.
+        For this learning rule this corresponds to zeroing all gradient
+        second moment estimates.
         """
-        for cache in self.caches:
-            cache *= 0.
+        for mom_2 in self.moms_2:
+            mom_2 *= 0.
 
     def update_params(self, grads_wrt_params):
         """Applies a single update to all parameters.
@@ -150,10 +137,14 @@ class RMSpropLearningRule(GradientDescentLearningRule):
                 with respect to each of the parameters passed to `initialise`
                 previously, with this list expected to be in the same order.
         """
-        for param, cache, grad in zip(self.params, self.caches, grads_wrt_params):
-            cache *= self.decay_rate
-            cache += (1. - self.decay_rate) * grad ** 2
-            param += - self.learning_rate * grad / (np.sqrt(cache) + self.eps)
+        for param, mom_2, grad in zip(
+                self.params, self.moms_2, grads_wrt_params):
+            mom_2 *= self.beta
+            mom_2 += (1. - self.beta) * grad**2
+            param -= (self.learning_rate * grad /
+                      (mom_2 + self.epsilon)**0.5)
+
+
 
 
 class MomentumLearningRule(GradientDescentLearningRule):
