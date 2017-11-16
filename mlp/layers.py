@@ -13,8 +13,10 @@ respect to the layer parameters.
 """
 
 import numpy as np
+
 import mlp.initialisers as init
 from mlp import DEFAULT_SEED
+from mlp.im2col import im2col_indices, col2im_indices
 
 
 class Layer(object):
@@ -363,8 +365,8 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
     def fprop(self, inputs, stochastic=True):
         """Forward propagates inputs through a layer."""
         num = inputs.shape[0]
-        mu = 1 / num * np.sum(inputs, axis=0)  # Size (H,)
-        sigma2 = 1 / num * np.sum((inputs - mu) ** 2, axis=0)  # Size (H,)
+        mu = 1. / num * np.sum(inputs, axis=0)  # Size (H,)
+        sigma2 = 1. / num * np.sum((inputs - mu) ** 2, axis=0)  # Size (H,)
         hath = (inputs - mu) * (sigma2 + self.epsilon) ** (-1. / 2.)
         return self.gamma * hath + self.beta
 
@@ -546,6 +548,7 @@ class ConvolutionalLayer(LayerWithParameters):
         self.kernels_penalty = kernels_penalty
         self.biases_penalty = biases_penalty
         self.cache = None
+        self.cnt = 0
 
     def fprop(self, inputs):
         """Forward propagates activations through the layer transformation.
@@ -556,24 +559,23 @@ class ConvolutionalLayer(LayerWithParameters):
         Returns:
             outputs: Array of layer outputs of shape (batch_size, output_dim).
         """
-        F = self.num_output_channels
-        HH = self.kernel_dim_1
-        WW = self.kernel_dim_2
-        N, C, H, W = inputs.shape
-        Hp = 1 + (H - HH)
-        Wp = 1 + (W - WW)
-        out = np.zeros((N, F, Hp, Wp))
-        for i in range(N):
-            for j in range(F):
-                for k in range(Hp):
-                    hs = k
-                    for l in range(Wp):
-                        ws = l
-                        # Window we want to apply the respective jth filter over (C, HH, WW)
-                        window = inputs[i, :, hs:hs + HH, ws:ws + WW]
-                        # Convolve
-                        out[i, j, k, l] = np.sum(window * self.kernels[j]) + self.biases[j]
-
+        W = self.kernels
+        b = self.biases
+        padding = 0
+        stride = 1
+        n_filters, d_filter, h_filter, w_filter = W.shape
+        n_x, d_x, h_x, w_x = inputs.shape
+        h_out = (h_x - h_filter + 2 * padding) / stride + 1
+        w_out = (w_x - w_filter + 2 * padding) / stride + 1
+        if not h_out.is_integer() or not w_out.is_integer():
+            raise Exception('Invalid output dimension!')
+        h_out, w_out = int(h_out), int(w_out)
+        X_col = im2col_indices(inputs, h_filter, w_filter, padding=padding, stride=stride)
+        W_col = W.reshape(n_filters, -1)
+        out = W_col @ X_col + b[:, np.newaxis]
+        out = out.reshape(n_filters, h_out, w_out, n_x)
+        out = out.transpose(3, 0, 1, 2)
+        self.cache = (inputs, W, b, stride, padding, X_col)
         return out
 
     def bprop(self, inputs, outputs, grads_wrt_outputs):
@@ -593,20 +595,29 @@ class ConvolutionalLayer(LayerWithParameters):
             Array of gradients with respect to the layer inputs of shape
             (batch_size, input_dim).
         """
-        F = self.num_output_channels
-        HH = self.kernel_dim_1
-        WW = self.kernel_dim_2
-        N, C, H, W = inputs.shape
-        Hp = 1 + (H - HH)
-        Wp = 1 + (W - WW)
-        dx = np.zeros_like(inputs)
-        for i in range(N):
-            for j in range(F):
-                for k in range(Hp):
-                    for l in range(Wp):
-                        dx[i, :, k:k + HH, l:l + WW] += self.kernels[j] * grads_wrt_outputs[i, j, k, l]
-        dx = dx[:, :, 0: H, 0:W]
-        return dx
+        X, W, b, stride, padding, X_col = self.cache
+        n_filter, d_filter, h_filter, w_filter = W.shape
+
+        db = np.sum(grads_wrt_outputs, axis=(0, 2, 3))
+        db = db.reshape(n_filter, -1)
+
+        dout_reshaped = grads_wrt_outputs.transpose(1, 2, 3, 0).reshape(n_filter, -1)
+        dW = dout_reshaped @ X_col.T
+        dW = dW.reshape(W.shape)
+
+        W_reshape = W.reshape(n_filter, -1)
+        dX_col = W_reshape.T @ dout_reshaped
+        dX = col2im_indices(dX_col, X.shape, h_filter, w_filter, padding=padding, stride=stride)
+        self.cache = [dW[:, :, ::-1, ::-1], db.flatten()]
+        # input_grad = np.empty(inputs)
+        # dW = np.empty(self.kernels.shape)
+        # bprop_conv_bc01(inputs, grads_wrt_outputs, self.kernels, input_grad, dW)
+        # n_imgs = grads_wrt_outputs.shape[0]
+        # db = np.sum(grads_wrt_outputs, axis=(0, 2, 3)) / (n_imgs)
+        # dW -= self.kernels
+        # self.cache = [db, dW]
+        # return input_grad
+        return dX
 
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
         """Calculates gradients with respect to layer parameters.
@@ -619,29 +630,7 @@ class ConvolutionalLayer(LayerWithParameters):
             list of arrays of gradients with respect to the layer parameters
             `[grads_wrt_kernels, grads_wrt_biases]`.
         """
-
-        F = self.num_output_channels
-        HH = self.kernel_dim_1
-        WW = self.kernel_dim_2
-        N, C, H, W = inputs.shape
-        Hp = 1 + (H - HH)
-        Wp = 1 + (W - WW)
-        dw = np.zeros_like(self.kernels)
-        db = np.zeros_like(self.biases)
-
-        for i in range(N):  # ith example
-            for j in range(F):  # jth filter
-                # Convolve this filter over windows
-                for k in range(Hp):
-                    hs = k
-                    for l in range(Wp):
-                        ws = l
-                        # Window we applies the respective jth filter over (C, HH, WW)
-                        window = inputs[i, :, hs:hs + HH, ws:ws + WW]
-                        # Compute gradient of out[i, j, k, l] = np.sum(window*w[j]) + b[j]
-                        db[j] += grads_wrt_outputs[i, j, k, l]
-                        dw[j] += window * grads_wrt_outputs[i, j, k, l]
-        return [dw[:, :, ::-1, ::-1], db]
+        return self.cache
 
     def params_penalty(self):
         """Returns the parameter dependent penalty term for this layer.
