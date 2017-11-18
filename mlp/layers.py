@@ -364,11 +364,28 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
 
     def fprop(self, inputs, stochastic=True):
         """Forward propagates inputs through a layer."""
-        num = inputs.shape[0]
-        mu = 1. / num * np.sum(inputs, axis=0)  # Size (H,)
-        sigma2 = 1. / num * np.sum((inputs - mu) ** 2, axis=0)  # Size (H,)
-        hath = (inputs - mu) * (sigma2 + self.epsilon) ** (-1. / 2.)
-        return self.gamma * hath + self.beta
+        N, D = inputs.shape
+        # step1: calculate mean
+        mu = 1. / N * np.sum(inputs, axis=0)
+        # step2: subtract mean vector of every trainings example
+        xmu = inputs - mu
+        # step3: following the lower branch - calculation denominator
+        sq = xmu ** 2
+        # step4: calculate variance
+        var = 1. / N * np.sum(sq, axis=0)
+        # step5: add eps for numerical stability, then sqrt
+        sqrtvar = np.sqrt(var + self.epsilon)
+        # step6: invert sqrtwar
+        ivar = 1. / sqrtvar
+        # step7: execute normalization
+        xhat = xmu * ivar
+        # step8: Nor the two transformation steps
+        gammax = self.gamma * xhat
+        # step9
+        out = gammax + self.beta
+        # store intermediate
+        self.cache = (xhat, self.gamma, xmu, ivar, sqrtvar, var, self.epsilon)
+        return out
 
     def bprop(self, inputs, outputs, grads_wrt_outputs):
         """Back propagates gradients through a layer.
@@ -387,15 +404,46 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
             Array of gradients with respect to the layer inputs of shape
             (batch_size, input_dim).
         """
-        N = inputs.shape[0]
-        mu = 1. / N * np.sum(inputs, axis=0)
-        var = 1. / N * np.sum((inputs - mu) ** 2, axis=0)
-        dh = (1. / N) * self.gamma * (var + self.epsilon) ** (-1. / 2.) * (
-            N * grads_wrt_outputs - np.sum(grads_wrt_outputs, axis=0)
-            - (inputs - mu) * (var + self.epsilon) ** (-1.0) * np.sum(
-                grads_wrt_outputs * (inputs - mu),
-                axis=0))
-        return dh
+        xhat, gamma, xmu, ivar, sqrtvar, var, eps = self.cache
+
+        # get the dimensions of the input/output
+        N, D = grads_wrt_outputs.shape
+
+        # step9
+        dbeta = np.sum(grads_wrt_outputs, axis=0)
+        dgammax = grads_wrt_outputs  # not necessary, but more understandable
+
+        # step8
+        dgamma = np.sum(dgammax * xhat, axis=0)
+        dxhat = dgammax * gamma
+
+        # step7
+        divar = np.sum(dxhat * xmu, axis=0)
+        dxmu1 = dxhat * ivar
+
+        # step6
+        dsqrtvar = -1. / (sqrtvar ** 2) * divar
+
+        # step5
+        dvar = 0.5 * 1. / np.sqrt(var + eps) * dsqrtvar
+
+        # step4
+        dsq = 1. / N * np.ones((N, D)) * dvar
+
+        # step3
+        dxmu2 = 2 * xmu * dsq
+
+        # step2
+        dx1 = (dxmu1 + dxmu2)
+        dmu = -1 * np.sum(dxmu1 + dxmu2, axis=0)
+
+        # step1
+        dx2 = 1. / N * np.ones((N, D)) * dmu
+
+        # step0
+        dx = dx1 + dx2
+        self.cache = [dgamma, dbeta]
+        return dx, dgamma, dbeta
 
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
         """Calculates gradients with respect to layer parameters.
@@ -409,12 +457,7 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
             list of arrays of gradients with respect to the layer parameters
             `[grads_wrt_weights, grads_wrt_biases]`.
         """
-        N = inputs.shape[0]
-        mu = 1. / N * np.sum(inputs, axis=0)
-        var = 1. / N * np.sum((inputs - mu) ** 2, axis=0)
-        dbeta = np.sum(grads_wrt_outputs, axis=0)
-        dgamma = np.sum((inputs - mu) * (var + self.epsilon) ** (-1. / 2.) * grads_wrt_outputs, axis=0)
-        return [dgamma, dbeta]
+        return self.cache
 
     def params_penalty(self):
         """Returns the parameter dependent penalty term for this layer.
@@ -438,6 +481,7 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
     def __repr__(self):
         return 'BatchNormalizationLayer(input_dim={0})'.format(
             self.input_dim)
+
 
 
 class SigmoidLayer(Layer):
