@@ -342,7 +342,8 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
     This layer is parameterised by a weight matrix and bias vector.
     """
 
-    def __init__(self, input_dim, rng=None):
+    def __init__(self, input_dim, rng=None, weights_initialiser=init.ConstantInit(1.0),
+                 biases_initialiser=init.ConstantInit(0.0)):
         """Initialises a parameterised affine layer.
 
         Args:
@@ -356,8 +357,8 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
                 None if no regularisation is to be applied to the biases.
         """
         super(BatchNormalizationLayer, self).__init__(rng)
-        self.beta = np.random.normal(size=(input_dim))
-        self.gamma = np.random.normal(size=(input_dim))
+        self.beta = biases_initialiser(input_dim)
+        self.gamma = weights_initialiser(input_dim)
         self.epsilon = 0.00001
         self.cache = None
         self.input_dim = input_dim
@@ -444,6 +445,7 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
         dx = dx1 + dx2
         self.cache = [dgamma, dbeta]
         return dx
+
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
         """Calculates gradients with respect to layer parameters.
 
@@ -480,7 +482,6 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
     def __repr__(self):
         return 'BatchNormalizationLayer(input_dim={0})'.format(
             self.input_dim)
-
 
 
 class SigmoidLayer(Layer):
