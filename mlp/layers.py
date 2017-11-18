@@ -559,7 +559,7 @@ class ConvolutionalLayer(LayerWithParameters):
         Returns:
             outputs: Array of layer outputs of shape (batch_size, output_dim).
         """
-        W = self.kernels
+        W = self.kernels[:, :, ::-1, ::-1]
         b = self.biases
         padding = 0
         stride = 1
@@ -650,7 +650,7 @@ class ConvolutionalLayer(LayerWithParameters):
 
     @params.setter
     def params(self, values):
-        self.kernels = values[0][:, :, ::-1, ::-1]
+        self.kernels = values[0]
         self.biases = values[1]
 
     def __repr__(self):
