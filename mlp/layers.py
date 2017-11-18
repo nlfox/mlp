@@ -1148,8 +1148,8 @@ class MaxPoolingLayer(Layer):
         n, d, h, w = inputs.shape
         X_reshaped = X.reshape(n * d, 1, h, w)
         size = self.pool_size
-        h_out = h / size
-        w_out = w / size
+        h_out = h // size
+        w_out = w // size
 
         # The result will be 4x9800
         # Note if we apply im2col to our 5x10x28x28 input, the result won't be as nice: 40x980
