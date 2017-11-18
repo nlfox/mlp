@@ -1153,7 +1153,7 @@ class MaxPoolingLayer(Layer):
 
         # The result will be 4x9800
         # Note if we apply im2col to our 5x10x28x28 input, the result won't be as nice: 40x980
-        X_col = im2col_indices(X_reshaped, size, size, padding=0, stride=1)
+        X_col = im2col_indices(X_reshaped, size, size, padding=0, stride=size)
 
         # Next, at each possible patch location, i.e. at each column, we're taking the max index
         max_idx = np.argmax(X_col, axis=0)
