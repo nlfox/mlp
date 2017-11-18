@@ -1133,6 +1133,7 @@ class MaxPoolingLayer(Layer):
                can be split in to pools with no dimensions left over.
         """
         self.pool_size = pool_size
+        self.cache = None
 
     def fprop(self, inputs):
         """Forward propagates activations through the layer transformation.
@@ -1143,14 +1144,31 @@ class MaxPoolingLayer(Layer):
         Returns:
             outputs: Array of layer outputs of shape (batch_size, output_dim).
         """
-        assert inputs.shape[-1] % self.pool_size == 0, (
-            'Last dimension of inputs must be multiple of pool size')
-        pooled_inputs = inputs.reshape(
-            inputs.shape[:-1] +
-            (inputs.shape[-1] // self.pool_size, self.pool_size))
-        pool_maxes = pooled_inputs.max(-1)
-        self._mask = pooled_inputs == pool_maxes[..., None]
-        return pool_maxes
+        X = inputs
+        n, d, h, w = inputs.shape
+        X_reshaped = X.reshape(n * d, 1, h, w)
+        size = self.pool_size
+        h_out = h / size
+        w_out = w / size
+
+        # The result will be 4x9800
+        # Note if we apply im2col to our 5x10x28x28 input, the result won't be as nice: 40x980
+        X_col = im2col_indices(X_reshaped, size, size, padding=0, stride=1)
+
+        # Next, at each possible patch location, i.e. at each column, we're taking the max index
+        max_idx = np.argmax(X_col, axis=0)
+
+        # Finally, we get all the max value at each column
+        # The result will be 1x9800
+        out = X_col[max_idx, range(max_idx.size)]
+
+        # Reshape to the output size: 14x14x5x10
+        out = out.reshape(h_out, w_out, n, d)
+
+        # Transpose to get 5x10x14x14 output
+        out = out.transpose(2, 3, 0, 1)
+        self.cache = [X_col, max_idx, n, d, h, w, size]
+        return out
 
     def bprop(self, inputs, outputs, grads_wrt_outputs):
         """Back propagates gradients through a layer.
@@ -1166,8 +1184,28 @@ class MaxPoolingLayer(Layer):
             Array of gradients with respect to the layer inputs of shape
             (batch_size, input_dim).
         """
-        return (
-            self._mask * grads_wrt_outputs[..., None]).reshape(inputs.shape)
+        X = inputs
+        X_col, max_idx, n, d, h, w, size = self.cache
+        dX_col = np.zeros_like(X_col)
+        dout = grads_wrt_outputs
+
+        # 5x10x14x14 => 14x14x5x10, then flattened to 1x9800
+        # Transpose step is necessary to get the correct arrangement
+        dout_flat = dout.transpose(2, 3, 0, 1).ravel()
+
+        # Fill the maximum index of each column with the gradient
+
+        # Essentially putting each of the 9800 grads
+        # to one of the 4 row in 9800 locations, one at each column
+        dX_col[max_idx, range(max_idx.size)] = dout_flat
+
+        # We now have the stretched matrix of 4x9800, then undo it with col2im operation
+        # dX would be 50x1x28x28
+        dX = col2im_indices(dX_col, (n * d, 1, h, w), size, size, padding=0, stride=1)
+
+        # Reshape back to match the input dimension: 5x10x28x28
+        dX = dX.reshape(X.shape)
+        return dX
 
     def __repr__(self):
         return 'MaxPoolingLayer(pool_size={0})'.format(self.pool_size)
