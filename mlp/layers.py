@@ -443,8 +443,7 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
         # step0
         dx = dx1 + dx2
         self.cache = [dgamma, dbeta]
-        return dx, dgamma, dbeta
-
+        return dx
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
         """Calculates gradients with respect to layer parameters.
 
