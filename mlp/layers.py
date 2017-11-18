@@ -1201,7 +1201,7 @@ class MaxPoolingLayer(Layer):
 
         # We now have the stretched matrix of 4x9800, then undo it with col2im operation
         # dX would be 50x1x28x28
-        dX = col2im_indices(dX_col, (n * d, 1, h, w), size, size, padding=0, stride=1)
+        dX = col2im_indices(dX_col, (n * d, 1, h, w), size, size, padding=0, stride=size)
 
         # Reshape back to match the input dimension: 5x10x28x28
         dX = dX.reshape(X.shape)
