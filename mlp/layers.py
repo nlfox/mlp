@@ -604,21 +604,19 @@ class ConvolutionalLayer(LayerWithParameters):
             outputs: Array of layer outputs of shape (batch_size, output_dim).
         """
         W = self.kernels[:, :, ::-1, ::-1]
-        padding = 0
-        stride = 1
         n_filters, d_filter, h_filter, w_filter = W.shape
         n_x, d_x, h_x, w_x = inputs.shape
-        h_out = (h_x - h_filter + 2 * padding) / stride + 1
-        w_out = (w_x - w_filter + 2 * padding) / stride + 1
+        h_out = (h_x - h_filter) + 1
+        w_out = (w_x - w_filter) + 1
         if not h_out.is_integer() or not w_out.is_integer():
             raise Exception('Invalid output dimension!')
         h_out, w_out = int(h_out), int(w_out)
-        X_col = im2col_indices(inputs, h_filter, w_filter, padding=padding, stride=stride)
+        X_col = im2col_indices(inputs, h_filter, w_filter, stride=1)
         W_col = W.reshape(n_filters, -1)
         out = W_col @ X_col + self.biases[:, np.newaxis]
         out = out.reshape(n_filters, h_out, w_out, n_x)
         out = out.transpose(3, 0, 1, 2)
-        self.cache = (inputs, W, self.biases, stride, padding, X_col)
+        self.cache = (inputs, W, self.biases, X_col)
         return out
 
     def bprop(self, inputs, outputs, grads_wrt_outputs):
@@ -638,7 +636,7 @@ class ConvolutionalLayer(LayerWithParameters):
             Array of gradients with respect to the layer inputs of shape
             (batch_size, input_dim).
         """
-        X, W, b, stride, padding, X_col = self.cache
+        X, W, b, X_col = self.cache
         n_filter, d_filter, h_filter, w_filter = W.shape
 
         db = np.sum(grads_wrt_outputs, axis=(0, 2, 3))
@@ -650,7 +648,7 @@ class ConvolutionalLayer(LayerWithParameters):
 
         W_reshape = W.reshape(n_filter, -1)
         dX_col = W_reshape.T @ dout_reshaped
-        dX = col2im_indices(dX_col, X.shape, h_filter, w_filter, padding=padding, stride=stride)
+        dX = col2im_indices(dX_col, X.shape, h_filter, w_filter, stride=1)
         self.cache = [dW[:, :, ::-1, ::-1], db.flatten()]
         return dX
 
@@ -1141,7 +1139,7 @@ class MaxPoolingLayer(Layer):
         size = self.pool_size
         h_out = h // size
         w_out = w // size
-        X_col = im2col_indices(X_reshaped, size, size, padding=0, stride=size)
+        X_col = im2col_indices(X_reshaped, size, size, stride=size)
         max_idx = np.argmax(X_col, axis=0)
         out = X_col[max_idx, range(max_idx.size)]
         out = out.reshape(h_out, w_out, n, d)
@@ -1169,7 +1167,7 @@ class MaxPoolingLayer(Layer):
         dout = grads_wrt_outputs
         dout_flat = dout.transpose(2, 3, 0, 1).ravel()
         dX_col[max_idx, range(max_idx.size)] = dout_flat
-        return col2im_indices(dX_col, (n * d, 1, h, w), size, size, padding=0, stride=size).reshape(X.shape)
+        return col2im_indices(dX_col, (n * d, 1, h, w), size, size, stride=size).reshape(X.shape)
 
     def __repr__(self):
         return 'MaxPoolingLayer(pool_size={0})'.format(self.pool_size)
