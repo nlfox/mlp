@@ -66,7 +66,7 @@
 ]
 
 \begin{abstract} 
-This paper focus on the classification task of EMNIST dataset. First we set up the baseline model, discussed the selection of activation function, number of hidden layer, regularization method and dropout rate. After we setup the baseline model, we start to investigate the influence of different learning rules. Then we evaluated the performance of Batch normalization layer. Finally we discussed the performance of convolutional layer and how different  convolutional layer parameters will influence the result. 
+This paper focus on the classification task of EMNIST dataset. First we set up the baseline model, discussed the selection of activation function, number of hidden layer, regularization method and dropout rate. After we have setup the baseline model, we started to investigate the influence of different learning rules. Then we evaluated the performance of Batch normalization layer. Finally we discussed the performance of convolutional layer and how different  convolutional layer parameters will influence the result. 
 \end{abstract} 
 
 \section{Introduction}
@@ -207,7 +207,10 @@ RELU	& 0.8186	\\
 
 
 \subsection{Number of hidden layers}
- On top of the result of activation functions, we evaluated the influence of different number of hidden layers. As we know, deeper network model can learn more complex decision boundaries. Compared with MNIST dataset, the output class number of EMNIST increased from 10 to 48, which might need deeper network to draw the decision boundary. We can see from the result in Figure~\ref{fig:base_num_layer}, having deeper layer number can result in better accuracy but higher possibility to overfit. From the Table~\ref{tab:layer_num} we can see that the accuracy is getting lower. The reason is at current stage we are not applying any early stopping mechanism or use other methods to stop overfitting. So we finally choose the best overall performance one: the network with 4 hidden layer.
+
+\paragraph{Motivation} As we know, deeper network model can learn more complex decision boundaries\citep{Goodfellow-et-al-2016}. Compared with MNIST dataset, the output class number of EMNIST increased from 10 to 48, which might need deeper network to draw the decision boundary. 
+\paragraph{Result}
+We can see from the result in Figure~\ref{fig:base_num_layer}, having deeper layer number can result in better accuracy but higher possibility to overfit. From the Table~\ref{tab:layer_num} we can see that the accuracy is getting lower. The reason is at current stage we are not applying any early stopping mechanism or use other methods to stop overfitting. So we finally choose the best overall performance one: the network with 4 hidden layer.
  
 
 \begin{table}[tb]
@@ -307,10 +310,12 @@ L2Penalty(0.01)	  		& 0.7196 	\\
 
 
 \subsection{Dropout layer}
-
 Dropout layer \citep{JMLR:v15:srivastava14a} is a simple layer which will randomly drop some of the unit and their connection to alleviate  overfitting.
+\paragraph{Motivation}
+As stated in the Dropout paper, "This significantly
+reduces overfitting and gives major improvements over other regularization methods."\citep{JMLR:v15:srivastava14a}. Our baseline model now is suffering from overfitting, so we are going to try Dropout layer for stopping overfitting. But one important thing is higher dropout rate can result in slower training process ( i.e.  need more epoch to converge). 
 
-Adding dropout layer is another method to alleviate overfitting issue. But higher dropout rate can result in slower training process ( i.e.  need more epoch to converge). The result is showed in Figure~\ref{fig:base_dropout}. Compared with the baseline, adding dropout layer can  significantly reduce overfitting tread. The models with dropout trains slower in training set, but unlike the one without dropout, the curve never shows a trend to overfit in validation set.  
+\paragraph{Result} The result is showed in Figure~\ref{fig:base_dropout} . Compared with the baseline, adding dropout layer can  significantly reduce overfitting tread. The models with dropout trains slower in training set, but unlike the one without dropout, the curve never shows a trend to overfit in validation set.  
 
 %In this section you should  report your baseline experiments for EMNIST.  No need for theoretical explanations of things covered in the course, but should you go beyond what was covered please explain what you did with references to relevant paper(s) if appropriate.   In this section you should aim to cover the both the ``what'' and the ``why'': \emph{what} you did, giving sufficient information (hyperparameter settings, etc.) so that someone else (e.g. another student on the course) could reproduce your results; and \emph{why} you performed the experiments you are reporting - what you are aiming to discover what is the motivation for the particular experiments you undertook. You should also provide some discussion and interpretation of your results.  
 
@@ -342,6 +347,15 @@ Dropout percent & Accuracy \\
 \vskip -3mm
 \end{table}
 
+
+
+\begin{figure}[tb]
+\begin{center}
+\centerline{\includegraphics[width=\columnwidth]{fig/dropout.pdf}}
+\caption{Comparison between models with different dropout rates.}
+\label{fig:base_dropout}
+\end{center}
+\end{figure} 
 
 
 
@@ -468,7 +482,13 @@ The result is showed as Figure~\ref{fig:lr}. This result can show that in our EM
 %Your discussion should interpret the results, both in terms of summarising the outcomes of a particular experiment, and attempting to relate to the underlying models. A good report would have some analysis, resulting in an understanding of why particular results are observed, perhaps with reference to the literature. Use bibtex to organise your references -- in this case the references are in the file \verb+example-refs.bib+.  Here is a an example reference \citep{langley00}.  
 
 \section{Batch normalisation}
-Batch normalization \citep{DBLP:journals/corr/IoffeS15} is a method to normalize layer inputs.  The algorithm is described as Algorithm~\ref{alg:batchnorm}. In our experiments, we are expecting to see the features described in original paper. "Batch Normalization allows us to use much higher learning rates and be less careful about initialization. It also acts as a regularizer, in some cases eliminating the need for Dropout." \citep{DBLP:journals/corr/IoffeS15}
+\paragraph{Definition} Batch normalization \citep{DBLP:journals/corr/IoffeS15} is a method to normalize layer inputs.  The algorithm is described as Algorithm~\ref{alg:batchnorm}. In our experiments, we are expecting to see the features described in original paper. "Batch Normalization allows us to use much higher learning rates and be less careful about initialization. It also acts as a regularizer, in some cases eliminating the need for Dropout." \citep{DBLP:journals/corr/IoffeS15}
+
+\paragraph{Motivation}
+"Batch Normalization allows us to use much higher learning rates and be less careful about initialization. It also acts as a regularizer, in some cases eliminating the need for Dropout." \citep{DBLP:journals/corr/IoffeS15}
+
+
+
 \subsection{Experiment result} 
 The result of the experiment is shown in Figure~\ref{fig:batchnorm}.
 
@@ -581,6 +601,7 @@ We also compared the performance of convolutional layers with different filter n
 
 
 
+
 %In this section you should present your experiments with convolutional networks.  Explain the idea of convolutional layers and pooling layers, and briefly explain how you did the implementation.  There is no need to include chunks of code.  You should report the experiments you have undertaken, again remembering to include \emph{what} experiments you performed (include details of hyperparameters, etc.),  \emph{why} you performed them (what was the motivation for the experiments, what research questions are you exploring), and the interpretation and discussion of your results.
 
 \begin{table}[tb]
@@ -594,8 +615,10 @@ We also compared the performance of convolutional layers with different filter n
 Model & Accuracy \\
 \hline
 \abovespace
-2 Convolutional layer    	& 0.8680 	\\
-1 Convolutional layer	 	& 0.8671 	\\
+2 Conv layer    	& 0.8680 	\\
+1 Conv layer (3x3)	 	& 0.8671 	\\
+1 Conv layer (5x5)	 	& 0.8671 	\\
+
 Baseline				  	& 0.8485 	\\
 
 \hline
@@ -615,6 +638,27 @@ Baseline				  	& 0.8485 	\\
 
 \section{Conclusions}
 \label{sec:concl}
+\paragraph{Baseline} For the baseline part. We can draw following conclusions from the experiment. 
+\begin{itemize}
+	\item \textbf{Activation function} ELU has the best overall performance than other activation functions.
+	\item \textbf{Number of hidden layer} More hidden layer can detect more complex decision boundaries, but we should be careful when selecting different layer number because if the network is too deep, the possibility of overfitting will increase.
+	\item \textbf{Regularization method} The parameter of regularization makes a big difference and adding L1 or L2 regularization is a good way to reduce overfit.
+	\item \textbf{Dropout rate} Dropout out can significantly surpress overfitting trend, but higher dropout rate means slower converge speed. We need to find  a balance between speed and performance.
+
+\end{itemize}
+
+\paragraph{Learning rule} For the learning rule part, we compared the difference between Adam, RMSProp and Stochastic gradient descent. From the experiment, we can see that RMSProp is much better than the original gradient descent. Taking away the influence of gradient value does help when training. Adam has better performance than RMSProp  proved that momentum does help training process to go in a right direction.
+
+\paragraph{Batch Normalization} Batch Normalization is a good way to increase training speed and reduce overfit.
+
+\paragraph{Convolutional network}
+\begin{itemize}
+	\item \textbf{Filter size} Filter size is relevant about the property of different datasets. In EMNIST evaluated in our experiment, using bigger filter can have better performance.
+	\item \textbf{Convolutional layer number} More stacked convolutional layers can contribute to better performance, this result might because deeper convolutional layer can learn more high-level features of the picture.
+	\item \textbf{Filter number} In our experiment, bigger filter number leads to better performance. Filters are used to detect specific feature, so more filters can lead to more low-level features of the original picture. This can provide more information, so the result can reasonably be better.
+\end{itemize}
+ 
+
 %You should draw conclusions from the experiments, related to the research questions outlined in the introduction (section~\ref{sec:intro}). You should state the conclusions clearly and concisely. It is good if the conclusion from one experiment influenced what you did in later experiments -- your aim is to learn from your experiments. Extra credit if you relate your findings to what has been reported in the literature.
 
 %A good conclusions section would also include a further work discussion, building on work done so far, and referencing the literature where appropriate.
