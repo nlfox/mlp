@@ -608,8 +608,6 @@ class ConvolutionalLayer(LayerWithParameters):
         n_x, d_x, h_x, w_x = inputs.shape
         h_out = (h_x - h_filter) + 1
         w_out = (w_x - w_filter) + 1
-        if not h_out.is_integer() or not w_out.is_integer():
-            raise Exception('Invalid output dimension!')
         h_out, w_out = int(h_out), int(w_out)
         X_col = im2col_indices(inputs, h_filter, w_filter, stride=1)
         W_col = W.reshape(n_filters, -1)
