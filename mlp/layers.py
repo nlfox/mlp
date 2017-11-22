@@ -604,7 +604,6 @@ class ConvolutionalLayer(LayerWithParameters):
             outputs: Array of layer outputs of shape (batch_size, output_dim).
         """
         W = self.kernels[:, :, ::-1, ::-1]
-        b = self.biases
         padding = 0
         stride = 1
         n_filters, d_filter, h_filter, w_filter = W.shape
@@ -616,10 +615,10 @@ class ConvolutionalLayer(LayerWithParameters):
         h_out, w_out = int(h_out), int(w_out)
         X_col = im2col_indices(inputs, h_filter, w_filter, padding=padding, stride=stride)
         W_col = W.reshape(n_filters, -1)
-        out = W_col @ X_col + b[:, np.newaxis]
+        out = W_col @ X_col + self.biases[:, np.newaxis]
         out = out.reshape(n_filters, h_out, w_out, n_x)
         out = out.transpose(3, 0, 1, 2)
-        self.cache = (inputs, W, b, stride, padding, X_col)
+        self.cache = (inputs, W, self.biases, stride, padding, X_col)
         return out
 
     def bprop(self, inputs, outputs, grads_wrt_outputs):
@@ -653,14 +652,6 @@ class ConvolutionalLayer(LayerWithParameters):
         dX_col = W_reshape.T @ dout_reshaped
         dX = col2im_indices(dX_col, X.shape, h_filter, w_filter, padding=padding, stride=stride)
         self.cache = [dW[:, :, ::-1, ::-1], db.flatten()]
-        # input_grad = np.empty(inputs)
-        # dW = np.empty(self.kernels.shape)
-        # bprop_conv_bc01(inputs, grads_wrt_outputs, self.kernels, input_grad, dW)
-        # n_imgs = grads_wrt_outputs.shape[0]
-        # db = np.sum(grads_wrt_outputs, axis=(0, 2, 3)) / (n_imgs)
-        # dW -= self.kernels
-        # self.cache = [db, dW]
-        # return input_grad
         return dX
 
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
@@ -1150,22 +1141,10 @@ class MaxPoolingLayer(Layer):
         size = self.pool_size
         h_out = h // size
         w_out = w // size
-
-        # The result will be 4x9800
-        # Note if we apply im2col to our 5x10x28x28 input, the result won't be as nice: 40x980
         X_col = im2col_indices(X_reshaped, size, size, padding=0, stride=size)
-
-        # Next, at each possible patch location, i.e. at each column, we're taking the max index
         max_idx = np.argmax(X_col, axis=0)
-
-        # Finally, we get all the max value at each column
-        # The result will be 1x9800
         out = X_col[max_idx, range(max_idx.size)]
-
-        # Reshape to the output size: 14x14x5x10
         out = out.reshape(h_out, w_out, n, d)
-
-        # Transpose to get 5x10x14x14 output
         out = out.transpose(2, 3, 0, 1)
         self.cache = [X_col, max_idx, n, d, h, w, size]
         return out
@@ -1188,24 +1167,9 @@ class MaxPoolingLayer(Layer):
         X_col, max_idx, n, d, h, w, size = self.cache
         dX_col = np.zeros_like(X_col)
         dout = grads_wrt_outputs
-
-        # 5x10x14x14 => 14x14x5x10, then flattened to 1x9800
-        # Transpose step is necessary to get the correct arrangement
         dout_flat = dout.transpose(2, 3, 0, 1).ravel()
-
-        # Fill the maximum index of each column with the gradient
-
-        # Essentially putting each of the 9800 grads
-        # to one of the 4 row in 9800 locations, one at each column
         dX_col[max_idx, range(max_idx.size)] = dout_flat
-
-        # We now have the stretched matrix of 4x9800, then undo it with col2im operation
-        # dX would be 50x1x28x28
-        dX = col2im_indices(dX_col, (n * d, 1, h, w), size, size, padding=0, stride=size)
-
-        # Reshape back to match the input dimension: 5x10x28x28
-        dX = dX.reshape(X.shape)
-        return dX
+        return col2im_indices(dX_col, (n * d, 1, h, w), size, size, padding=0, stride=size).reshape(X.shape)
 
     def __repr__(self):
         return 'MaxPoolingLayer(pool_size={0})'.format(self.pool_size)
