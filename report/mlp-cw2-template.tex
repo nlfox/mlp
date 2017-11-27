@@ -66,7 +66,7 @@
 ]
 
 \begin{abstract} 
-This paper focus on the classification task of EMNIST dataset. First we set up the baseline model, discussed the selection of activation function, number of hidden layer, regularization method and dropout rate. After we have setup the baseline model, we started to investigate the influence of different learning rules. Then we evaluated the performance of Batch normalization layer. Finally we discussed the performance of convolutional layer and how different  convolutional layer parameters will influence the result. 
+This paper focus on the classification task on EMNIST dataset. First we set up the baseline multilayer neural network model, discussed the selection of activation function, number of hidden layer, regularization method and dropout rate. After we have setup the baseline model, we started to investigate the influence of different learning rules. Then we evaluated the performance of Batch normalization layer. Finally we discussed the performance of convolutional layer and how different  convolutional layer parameters will influence the result. 
 \end{abstract} 
 
 \section{Introduction}
@@ -76,11 +76,21 @@ This paper focus on the classification task of EMNIST dataset. First we set up t
 
 %The introduction should place your work in context, giving the overall motivation for the work, and clearly outlining the research questions you have explored.  This section should also include a concise description of the Balanced EMNIST task and  data -- be precise: for example state the size of the training, validation, and test sets.
 
-The classification problem is a important part of machine learning and handwritten letters is quite frequently used to evaluate machine learning system performances. EMNIST\citep{DBLP:journals/corr/CohenATS17} is a new dataset for handwritten letters recognition. 
+Classification tasks are one of the most widely applied field of machine learning. Tasks classifying handwritten letters is quite frequently used to evaluate the performance of machine learning systems. EMNIST\citep{DBLP:journals/corr/CohenATS17} is a new dataset for handwritten letters recognition, which provided us the processed picture and its label. We are going to explore how different mechanisms will work on EMNIST dataset. We will train our system on a training set of 100000 examples,  evaluate the performance on validation set of 15800 examples and test the model using test set of 15800 examples.
 
-We are going to explore how different mechanisms will work on EMNIST dataset. We  will first evaluate simple neural network classifier, and use the tuned result as baseline for following discussions. For different learning rules, we are going discuss about their difference and their actual performance on the dataset. Also we will try to explain the result of experiment. Secondly, we will discuss about the concept of batch normalization and in what aspect it's going to help machine learning systems. Finally, we will explain about convolutional network models and discuss about efficient ways to implement  a convolutional layer. Also, we will evaluate the performance of our convolutional layer and try to explain how the parameters of convolutional layer is going to influence the classification result.
 
-We will train our system on a training set of 100000 examples,  evaluate the performance on validation set of 15800 examples and test the model using test set of 15800 examples.
+\paragraph{Baseline}
+We  will first evaluate simple neural network classifiers and use the tuned result as baseline for following discussions. We are going to first tune some two properties of our neural network model: activation function and depth. In order to suppress overfitting, we are going to explore how regularization and dropout will contribute when eliminating overfitting. Finally we will summarize and set up the baseline model for the following part.
+
+\paragraph{Learning rules}
+For different learning rules, we are going discuss about their difference and  carry out experiments to check their actual performance on the EMNIST dataset. Also we will try to interpret and try to explain the result of experiment.
+
+\paragraph{Batch Normalization}
+ We will discuss about the concept of batch normalization and how batch normalization can improve the performance of our model. We will carry out the experiment and explain the result.
+ \paragraph{Convolutional neural networks}
+ Finally, we will explain about convolutional network models and discuss about efficient ways to implement a convolutional layer. Also, we will evaluate the performance of our convolutional layer and try to explain how some basic parameters of convolutional layer (like number of filters and size of filters) is going to influence the performance based on experiment result.
+
+
 
 
 
@@ -97,77 +107,42 @@ We will train our system on a training set of 100000 examples,  evaluate the per
 The hyper parameters above we won't change during this part. There are few properties we want to investigate in the following part : activation function, hidden layer number, regularization method, dropout rate.
 
 \subsection{Activation function selection}
-In this section, we compared different type of activation function to find out their performance on the EMNIST dataset.
-\paragraph{Restricted Linear Unit (ReLU)}
-ReLU \citep{icml2010_NairH10} has the following form.
-\begin{equation}
-  \relu(x) = \max(0, x) ,
-\end{equation} 
-which has the gradient:
-\begin{equation}
-  \frac{d}{dx} \relu(x) =
-     \begin{cases} 
-      0      & \quad \text{if } x \leq  0 \\
-      1       & \quad \text{if } x > 0 .
-    \end{cases} 
-\end{equation}
 
-\paragraph{Leaky Restricted Linear Unit (Leaky ReLU)}
-Leaky ReLU \citep{Maas13rectifiernonlinearities} has the following form.
-\begin{equation}
-	\lrelu(x) = 
+\paragraph{Definition}
+
+In this section, we compared different type of activation function to find out their performance on the EMNIST dataset.
+\subparagraph {Rectified Linear Units (ReLU)} \citep{icml2010_NairH10} is a quite widely used activation function. The advantage of ReLU is that the model would be easier to optimize if its behavior similar to linear \citep{Goodfellow-et-al-2016}.
+ $$\relu(x) = \max(0, x)$$
+
+\subparagraph {Leaky ReLU} \citep{Maas13rectifiernonlinearities} The problem with ReLU is that ReLU sometimes might not working when the activation is zero. Leaky ReLU is going to fix that problem.
+$$	\lrelu(x) = 
 	\begin{cases} 
       \alpha x      & \quad \text{if } x \leq  0 \\
       x      & \quad \text{if } x > 0 .
     \end{cases} 
-\end{equation}
-which has the gradient:
-\begin{equation}
-  \frac{d}{dx} \lrelu(x) =
-     \begin{cases} 
-      \alpha      & \quad \text{if } x \leq  0 \\
-      1       & \quad \text{if } x > 0 .
-    \end{cases} 
-\end{equation}
+$$
+
 
 \paragraph{Exponential Linear Units (ELU)}
-ELU\citep{2015arXiv151107289C} has the following form
-\begin{equation}
-	\elu(x) = 
+ELU\citep{2015arXiv151107289C} is going to fix the similar problem as LeakyReLU.
+$$	\elu(x) = 
 	\begin{cases} 
       \alpha (\exp(x)-1)      & \quad \text{if } x \leq  0 \\
       x      & \quad \text{if } x > 0 .
-    \end{cases} 
-\end{equation}
-which has the gradient:
-\begin{equation}
-  \frac{d}{dx} \elu(x) =
-     \begin{cases} 
-      \alpha \exp(x)     & \quad \text{if } x \leq  0 \\
-      1       & \quad \text{if } x > 0 .
-    \end{cases} 
-\end{equation}
-
+    \end{cases} $$
+    
 
 \paragraph{Scaled Exponential Linear Units (SELU)}
-SELU \citep{2017arXiv170602515K} has the following form.
-\begin{equation}
+SELU \citep{2017arXiv170602515K} is a variance of ELU, adding an extra tunable parameter  $\lambda$.
+$$
 	\selu(x) = \lambda
 	\begin{cases} 
       \alpha (\exp(x)-1)      & \quad \text{if } x \leq  0 \\
       x      & \quad \text{if } x > 0 .
     \end{cases} 
-\end{equation}
-which has the gradient:
-\begin{equation}
-  \frac{d}{dx} \elu(x) = \lambda
-     \begin{cases} 
-      \alpha \exp(x)     & \quad \text{if } x \leq  0 \\
-      1       & \quad \text{if } x > 0 .
-    \end{cases} 
-\end{equation}
-
-As Figure~\ref{fig:base_act_func} shows, ELU have the best overall performance: both in validation set and training set. ELU always has better accuracy and lower cross-entropy error than other activation functions. In test set, ELU also has best accuracy.
+$$
+\paragraph{Result}
+As Figure~\ref{fig:base_act_func} shows, ELU have the best overall performance: both in validation set and training set. ELU always has better accuracy and lower cross-entropy error than other activation functions. In test set, ELU also has best accuracy. The reason might because the feature of ELU: compared with ReLU and LReLU, ELU can keep negative values and restrict these values in a certain range $[ -\alpha , 0 ]$. 
 
 
 \begin{table}[tb]
@@ -206,9 +181,12 @@ RELU	& 0.8186	\\
 \end{figure} 
 
 
-\subsection{Number of hidden layers}
+\subsection{Depth of neural networks}
 
-\paragraph{Motivation} As we know, deeper network model can learn more complex decision boundaries\citep{Goodfellow-et-al-2016}. Compared with MNIST dataset, the output class number of EMNIST increased from 10 to 48, which might need deeper network to draw the decision boundary. 
+\paragraph{Definition} The depth of a neural network means the number of hidden layers between input and output layer. We are going to increase the depth of the neural network by adding hidden layers to original model.
+
+\paragraph{Motivation} Deeper network model can learn more complex decision boundaries\citep{Goodfellow-et-al-2016}.  Compared with MNIST dataset, the output class number of EMNIST increased from 10 to 48, which might need deeper network to draw the decision boundary. 
+
 \paragraph{Result}
 We can see from the result in Figure~\ref{fig:base_num_layer}, having deeper layer number can result in better accuracy but higher possibility to overfit. From the Table~\ref{tab:layer_num} we can see that the accuracy is getting lower. The reason is at current stage we are not applying any early stopping mechanism or use other methods to stop overfitting. So we finally choose the best overall performance one: the network with 4 hidden layer.
  
@@ -258,12 +236,13 @@ Layer number & Accuracy \\
 
 
 \subsection{Regularization}
-We have discussed in previous part that deeper network can have higher possibility to overfit. In order to alleviate the influence of overfitting, we are going to use regularization. 
 
-
+\paragraph{Definition}
 Regularization is basically adding regularization terms to the error function. Based on regularization type, they are penalizing specific features by increasing error. L1 regularization is adding the sum of absolute values of the weights to error. L2 regularization is the sum of the squares of all the weights in the network and then multiplied by $\frac{\lambda}{2n}$. Both of these regularization methods will penalize big weights. % L1 and L2 specified penalize thing%
 
+\paragraph{Motivation} We have discussed in previous part that deeper network can have higher possibility to overfit. In order to alleviate overfitting, we are going to use regularization.
 
+\paragraph{Result}
 The result is in Figure~\ref{fig:base_reg}. In the error distribution, we can see that if regularization parameter is not small enough, then it will cause the error to stay in a high level and influence the final result of training.  From the curve of error in validation set, we can see that regularisation successfully suppress the increase trend of validation set error. The one with best overall performance is L2 regularization with decay rate at 1e-4 (0.0001).
 
 
@@ -310,7 +289,7 @@ L2Penalty(0.01)	  		& 0.7196 	\\
 
 
 \subsection{Dropout layer}
-Dropout layer \citep{JMLR:v15:srivastava14a} is a simple layer which will randomly drop some of the unit and their connection to alleviate  overfitting.
+\paragraph{Definition} Dropout layer \citep{JMLR:v15:srivastava14a} is a simple layer which will randomly drop some of the unit and their connection to alleviate  overfitting.
 \paragraph{Motivation}
 As stated in the Dropout paper, "This significantly
 reduces overfitting and gives major improvements over other regularization methods."\citep{JMLR:v15:srivastava14a}. Our baseline model now is suffering from overfitting, so we are going to try Dropout layer for stopping overfitting. But one important thing is higher dropout rate can result in slower training process ( i.e.  need more epoch to converge). 
@@ -362,7 +341,7 @@ Dropout percent & Accuracy \\
 
 
 \subsection{Final baseline model}
-After all the discussions above, the final model we choose for baseline is
+After all the discussions above, the final model we choose for baseline is as follows
 \begin{itemize}
 	\item ELU activation function
 	\item 4 hidden layers with 100 hidden units per layer
@@ -389,7 +368,8 @@ After all the discussions above, the final model we choose for baseline is
 
 \section{Learning rules}
 %In this section you should compare RMSProp and Adam with gradient descent, introducing these learning rules either as equations or as algorithmic pseudocode.  If you present the different approaches as algorithms, you can use the \verb+algorithm+ and \verb+algorithmic+ environments to format pseudocode (for instance, Algorithm~\ref{alg:example}). These require the corresponding style files, \verb+algorithm.sty+ and \verb+algorithmic.sty+ which are supplied with this package. 
-In this section we will evaluate the performance of different learning rules on EMNIST dataset.
+\paragraph{Motivation} 
+In general, training a model is a process of finding the local minimum of error. In the past, we use gradient descent, which is simple. People have investigated multiple ways to improve the performance of learning rules.One big problem of the gradient descent  rule we used before is that we need to tune the learning rate, which can cost a lot of time and fixed learning rates are not always going to be the optimum. We are going to explore some adaptive learning algorithms to check if they can give us a better result on our dataset.
 
 
 
@@ -420,8 +400,8 @@ In this section we will evaluate the performance of different learning rules on 
 \end{algorithm}
 
 
-\subsection{Compare different learning rules}
-The original learning rule we use is  Gradient Descent, which is simply moving the step (learning rate * gradient) in the negative gradient direction. One of the shortcomings of this method is that different weights can have different magnitude of gradients. So choosing a right global learning rate is hard. To solve these issues, we are going to use learning rules with adaptive learning rate.
+\subsection{Definition}
+The original learning rule we use is Gradient Descent, which is simply moving the step (learning rate * gradient) in the negative gradient direction. One of the shortcomings of this method is that different weights can have different magnitude of gradients. So choosing a right global learning rate is hard. To solve these issues, we are going to use learning rules with adaptive learning rate.
 
 \paragraph{RMSProp} RMSProp \citep{Tieleman2012} is based on RProp\citep{rprop}. RProp suggests that we can use only the sign of the gradient and move same step size. This can prevent the issue like some huge gradient suddenly appears. But RProp won't work for mini-batch. Because RProp is equivalent of using a learning rate of $ \frac{1}{g_i}$($g_i$ is the gradient) where $g_i$ can be quite different over different mini batch. Having random learning rate can make converge more difficult \citep{Tieleman2012}. RMSProp can solve the problem by setting learning rate similar to previous mini batches. 
   $$S_i(0) = 0$$
@@ -462,8 +442,10 @@ SGD			& 0.8485 	\\
 
 
 
-\subsection{Experiment result}
-The result is showed as Figure~\ref{fig:lr}. This result can show that in our EMNIST dataset,  Adam > RMSProp > SGD. Adam and RMSProp takes less epoch to converge. After 50 epochs, all the curves seems to have similar error and accuracy, that might because they reached a similar local optimum. Adam is slightly better than RMSProp, which might because the advantage of having momentum. Momentum can help better and quicker converge as Adam paper suggested.
+\subsection{Experiment result and analysis}
+The result is showed as Figure~\ref{fig:lr}. We run the experiment on baseline model and the only variable is setting of learning rule. The learning rule we used is Gradient Descend (learning rate: 0.1), Adam (learning rate 0.001), RMSProp (learning rate 0.001).
+
+ This result can show that in our EMNIST dataset,  Adam > RMSProp > SGD. Adam and RMSProp takes less epoch to converge. After 50 epochs, all the curves seems to have similar error and accuracy, that might because they reached a similar local optimum. RMSProp is better than Gradient descent, which proved that using only the sign of the gradient is a good trick for improving training process. Adam is slightly better than RMSProp, which might because the advantage of having momentum. Momentum can help better and quicker converge as Adam paper suggested.
 
 \begin{figure}[tb]
 \begin{center}
@@ -482,14 +464,20 @@ The result is showed as Figure~\ref{fig:lr}. This result can show that in our EM
 %Your discussion should interpret the results, both in terms of summarising the outcomes of a particular experiment, and attempting to relate to the underlying models. A good report would have some analysis, resulting in an understanding of why particular results are observed, perhaps with reference to the literature. Use bibtex to organise your references -- in this case the references are in the file \verb+example-refs.bib+.  Here is a an example reference \citep{langley00}.  
 
 \section{Batch normalisation}
-\paragraph{Definition} Batch normalization \citep{DBLP:journals/corr/IoffeS15} is a method to normalize layer inputs.  The algorithm is described as Algorithm~\ref{alg:batchnorm}. In our experiments, we are expecting to see the features described in original paper. "Batch Normalization allows us to use much higher learning rates and be less careful about initialization. It also acts as a regularizer, in some cases eliminating the need for Dropout." \citep{DBLP:journals/corr/IoffeS15}
 
 \paragraph{Motivation}
-"Batch Normalization allows us to use much higher learning rates and be less careful about initialization. It also acts as a regularizer, in some cases eliminating the need for Dropout." \citep{DBLP:journals/corr/IoffeS15}
+"Batch Normalization allows us to use much higher learning rates and be less careful about initialization. It also acts as a regularizer, in some cases eliminating the need for Dropout." \citep{DBLP:journals/corr/IoffeS15} Our model suffers a lot from overfitting, so we are going to try batch normalization and test if it can help our model get rid of overfitting.
+
+
+\subsection{Definition} Batch normalization \citep{DBLP:journals/corr/IoffeS15} is a method to normalize layer inputs.  The algorithm is described as Algorithm~\ref{alg:batchnorm}. \citep{DBLP:journals/corr/IoffeS15}
 
 
 
-\subsection{Experiment result} 
+\subsection{Experiment result and analysis} 
+
+\paragraph{Experiment setting}
+For the experiment, we are going to insert BatchNormlization Layers in front of the non-linearity layers as suggested in the original paper\citep{DBLP:journals/corr/IoffeS15}.
+
 The result of the experiment is shown in Figure~\ref{fig:batchnorm}.
 
 \paragraph{Evaluating the feature of reducing overfit} Adding batch normalization layer did increases training speed and reduced overfit. From the graph, we can compare the curve of "Baseline without Dropout" and "BatchNorm without Dropout". We can see that "Baseline without Dropout" start to overfit ( we can tell from the increasing validation set error and decreasing validation set accuracy) after 30 epochs, while "BatchNorm without Dropout" didn't increase. 
@@ -498,9 +486,6 @@ The reason of this phenomenon is that regularizers are simply adding terms to er
 
 
 \paragraph{Comparing with Dropout} So we compared BatchNorm with dropout and without Dropout. We can have a look at Figure~\ref{fig:batchnorm} and compare the curve of "Baseline with Dropout" and "BatchNorm with Dropout". We can see that initially, the one with BatchNorm improves more quickly, but after 10 epoch, the one with BatchNorm slowed down. This might because having a extra layer can slow down the training process. %???%
-
-
-
 
 
 \begin{figure}[tb]
@@ -535,22 +520,26 @@ The reason of this phenomenon is that regularizers are simply adding terms to er
 %In this section you should present batch normalisation,  supported using equations or algorithmic pseudocode.  Following this present your experiments, again remembering to include the ``what'', the ``why'', and the interpretation of results.
 
 \section{Convolutional networks}
+
+\paragraph{Motivation}
+Convolutional networks are quite widely used in modern machine learning systems, and it shows great performance especially in image recognition. So we are going to apply convolutional networks on our models.
+ 
 \subsection{Convolutional layer}
 
-The idea of convolutional layer is to use shared filters to detect features and form feature maps. All the filters can be learned by back propagation when minimizing the error, but we still need to manually set filter size and number. The basic method is to apply filters to small windows of original picture and produce a feature map. Compared with the old method we use, which is simply flatten the picture into independent points, convolution layers can make use of the positional information and detect same feature in different place in the picture.
+The idea of convolutional layer is using shared filters to detect features and produce feature maps as input to next layer. All the filters can be learned by back propagation when minimizing the error, but we still need to manually set filter size and number. The basic method is to apply filters to small windows of original picture and produce a feature map. Compared with the old method we use, which is simply flatten the picture into independent points, convolution layers can make use of the positional information and detect same feature in different place in the training example.
 
 \paragraph{Implementing a convolution layer: a naive approach }
 The most intuitive way to implement convolution layer is using for-loops. First loop over each example in mini-batch, for each example loop over filters. Then loop over sliding windows of filter size in original picture, and then multiply the windows matrix with filter matrix. This approach is quite easy to understand, but running quite slow in practice.
 
 
 \paragraph{Implement a convolution layer: matrix manipulation. }
-The for-loop version is quite slow and there is a better way to optimize it. The idea is, instead of use for-loop to move the sliding window and do dot product, we can expand the original matrix and gather all the possible locations that we can apply a filter to. This can be done by using im2col \citep{im2col} After we get the expanded matrix, we can do a dot product it. This optimized approach significantly boosted the performance. The original implementation takes 30 minutes for one epoch, while im2col version only needs 2 minutes.
+The for-loop version is quite slow and there is a better way to optimize it. The idea is, instead of use for-loop to move the sliding window and do dot product, we can expand the original matrix and gather all the possible locations that we can apply a filter to. This can be done by using im2col \citep{im2col} After we get the expanded matrix, we can do a dot product on it. This optimized approach significantly boosted the performance. The original implementation takes 30 min 27sec for one epoch, while im2col version only needs 120 seconds.
 
 
 \begin{figure}[tb]
 \begin{center}
 \centerline{\includegraphics[width=\columnwidth]{fig/cnn.pdf}}
-\caption{Evaluate batch norm.}
+\caption{Comparing different form of convolutional neural network.}
 \label{fig:cnn}
 \end{center}
 \end{figure} 
@@ -564,10 +553,10 @@ Doing for-loop again is the most simple and direct method. Loop over all example
 \paragraph{Implementing Maxpooling layer: matrix manipulation}
 Similar to convolutional layer, this time we also need to expend the original matrix, but instead of doing dot product, we are going to apply max operation.
 
-\subsection{Experiment}
+\subsection{Experiment Result and analysis}
 The result is in Figure~\ref{fig:cnn}, and the test set accuracy is in Table~\ref{tab:cnn} . 
 \paragraph{Comparing with baseline} 
-We added 1 Convolutional Layer with 5 kernel number and 5x5 kernel size followed by an 2x2 2D Maxpooling Layer(curve "1 Conv Layer" in Figure~\ref{fig:cnn}) in front of the original baseline model. The network structure is as follows.
+We added 1 Convolutional Layer with 5 kernel number and 5x5 kernel size followed by an 2x2 2D Maxpooling Layer(curve "Conv(5x5,5)" in Figure~\ref{fig:cnn}) in front of the original baseline model. The network structure is as follows.
 
 \begin{itemize}
 	\item[->] Convoltional Layer (1 channel, 5 kernel, 5x5 feature map)
@@ -579,7 +568,7 @@ We added 1 Convolutional Layer with 5 kernel number and 5x5 kernel size followed
 The improvement is quite significant. The reason I think is using convolutional layers did provided the following hidden layers with extra information which is helpful for classification, because convolutional layer can detect different features making use of the positional information using shared kernel. 
 
 \paragraph{Difference between different number of convolutional layers. }
-We compared models with different number of convolutional layers. Figure~\ref{fig:cnn} shows the curve. The curve "2 Conv Layer" is a model with an extra Convolutional layer and Maxpooling layer. The network structure is as follows. The reason I think is the second convolutional layer can help detect higher dimensional patterns as mentioned in \citep{Lecun98gradient-basedlearning}. First layer of convolutional network can detect low-level features like straight line, corners, the second convolutional layer can help form higher level features like cross, circle etc., because each window will contains more valid informations. For example, a 5x5 window in second convolutional layer contains extracted information(by maxpooling and kernel) of 14x14 space of original picture. With more higher dimensional features, the work of classification will become more easier, just like what we observed form the result.
+We compared models with different number of convolutional layers. Figure~\ref{fig:cnn} shows the curve. The curve "Conv(5x5,5)+Conv(5x5,10)" is a model with an extra Convolutional layer and Maxpooling layer. The network structure is as follows. Comparing it with model "Conv(5x5,5)", we can see that the deeper one has better performance. The reason can be that the second convolutional layer can help detect higher dimensional patterns as mentioned in \citep{Lecun98gradient-basedlearning}. First layer of convolutional network can detect low-level features like straight line, corners, the second convolutional layer can help form higher level features like cross, circle etc., because each window will contains more valid informations. For example, a 5x5 window in second convolutional layer contains extracted information(by maxpooling and kernel) of 14x14 space of original picture. With more higher dimensional features, the work of classification will become more easier, just like what we observed form the result.
 
 \begin{itemize}
 	\item[->] Convoltional Layer (1 channel, 5 kernel, 5x5 feature map)
@@ -591,13 +580,13 @@ We compared models with different number of convolutional layers. Figure~\ref{fi
 	\item[->] Baseline model
 \end{itemize}
 
-Comparing it with model "1 Conv Layer", we can see that the deeper one has better performance. As \citep{Lecun98gradient-basedlearning} described.
+
 
 \paragraph{Different filter size}
-We compared the performance of convolutional networks with different filter size. The curve "1 Conv Layer" has 5x5 filter size as mentioned above. The curve "1 Conv Layer 3x3" has 3x3 filter size in the first convolutional layer. The results turns out to be the one with bigger filter size performs better. I think tuning this parameter should based on specific dataset. As we have discussed above, this convolutional layer is trying to detect low level features of the picture. For EMNIST dataset, 3x3 window is too small to detect even low-level features.
+We compared the performance of convolutional networks with different filter size. The curve "Conv(5x5,5)" has 5x5 filter size as mentioned above. The curve "Conv(3x3,5)" has 3x3 filter size in the first convolutional layer. The results turns out to be the one with bigger filter size performs better. I think tuning this parameter should based on specific dataset. As we have discussed above, this convolutional layer is trying to detect low level features of the picture. For EMNIST dataset, 3x3 window is too small to detect even low-level features.
 
 \paragraph{Different filter number}
-We also compared the performance of convolutional layers with different filter number. 
+We also compared the performance of convolutional layers with different filter number. In the figure, we can compare the curve "Conv(5x5,5)" with "Conv(5x5,10)". We can see the one with 10 kernel has generally better performance. This can because that the more kernels we use, the more different features we can detect.
 
 
 
@@ -649,15 +638,20 @@ Baseline				  	& 0.8485 	\\
 
 \paragraph{Learning rule} For the learning rule part, we compared the difference between Adam, RMSProp and Stochastic gradient descent. From the experiment, we can see that RMSProp is much better than the original gradient descent. Taking away the influence of gradient value does help when training. Adam has better performance than RMSProp  proved that momentum does help training process to go in a right direction.
 
-\paragraph{Batch Normalization} Batch Normalization is a good way to increase training speed and reduce overfit.
+\paragraph{Batch Normalization} We compared baseline networks with and without batch normalization. As a result of our experiment, we can see that adding Batch Normalization is a good way to accelerate training process and reduce overfit.
 
 \paragraph{Convolutional network}
 \begin{itemize}
-	\item \textbf{Filter size} Filter size is relevant about the property of different datasets. In EMNIST evaluated in our experiment, using bigger filter can have better performance.
+	\item \textbf{Filter size} Filter size is relevant to the property of different datasets. In EMNIST evaluated in our experiment, using bigger filter can have better performance, the reason of which might be the bigger filter can include more details and identify more general patterns, but this quite depends on different datasets.
 	\item \textbf{Convolutional layer number} More stacked convolutional layers can contribute to better performance, this result might because deeper convolutional layer can learn more high-level features of the picture.
-	\item \textbf{Filter number} In our experiment, bigger filter number leads to better performance. Filters are used to detect specific feature, so more filters can lead to more low-level features of the original picture. This can provide more information, so the result can reasonably be better.
+	\item \textbf{Filter number} In our experiment with one convolutional layers, bigger filter number leads to better performance. Filters are used to detect specific feature, so more filters can lead to more low-level features of the original picture. This can provide more information, so the result can reasonably be better.
 \end{itemize}
  
+\paragraph{Future work} 
+\begin{itemize}
+	\item \textbf{Visualization} In recent research with convolutional networks, there is a idea to retrieve what feature convolutional layer is actually extracting.
+	\item \textbf{More Convolutional Network Experiments} There is still some place for our convolutional model to improve, for example, adding BatchNormalization, tune learning rate, learning algorithm and dropout rate etc.
+\end{itemize}
 
 %You should draw conclusions from the experiments, related to the research questions outlined in the introduction (section~\ref{sec:intro}). You should state the conclusions clearly and concisely. It is good if the conclusion from one experiment influenced what you did in later experiments -- your aim is to learn from your experiments. Extra credit if you relate your findings to what has been reported in the literature.
 

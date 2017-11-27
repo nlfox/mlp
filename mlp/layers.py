@@ -557,18 +557,16 @@ class ConvolutionalLayer(LayerWithParameters):
         Returns:
             outputs: Array of layer outputs of shape (batch_size, output_dim).
         """
-        W = self.kernels[:, :, ::-1, ::-1]
-        n_filters, d_filter, h_filter, w_filter = W.shape
+        kernels = self.kernels[:, :, ::-1, ::-1]
+        n_filters, d_filter, h_filter, w_filter = kernels.shape
         n_x, d_x, h_x, w_x = inputs.shape
-        h_out = (h_x - h_filter) + 1
-        w_out = (w_x - w_filter) + 1
-        h_out, w_out = int(h_out), int(w_out)
-        X_col = im2col_indices(inputs, h_filter, w_filter, stride=1)
-        W_col = W.reshape(n_filters, -1)
-        out = W_col @ X_col + self.biases[:, np.newaxis]
-        out = out.reshape(n_filters, h_out, w_out, n_x)
-        out = out.transpose(3, 0, 1, 2)
-        self.cache = (inputs, W, self.biases, X_col)
+        h_out = int((h_x - h_filter) + 1)
+        w_out = int((w_x - w_filter) + 1)
+        inputs_col = im2col_indices(inputs, h_filter, w_filter, stride=1)
+        kernels_col = kernels.reshape(n_filters, -1)
+        out = kernels_col.dot(inputs_col) + self.biases[:, np.newaxis]
+        out = out.reshape(n_filters, h_out, w_out, n_x).transpose(3, 0, 1, 2)
+        self.cache = (inputs, kernels, self.biases, inputs_col)
         return out
 
     def bprop(self, inputs, outputs, grads_wrt_outputs):
@@ -590,16 +588,13 @@ class ConvolutionalLayer(LayerWithParameters):
         """
         X, W, b, X_col = self.cache
         n_filter, d_filter, h_filter, w_filter = W.shape
-
         db = np.sum(grads_wrt_outputs, axis=(0, 2, 3))
         db = db.reshape(n_filter, -1)
-
         dout_reshaped = grads_wrt_outputs.transpose(1, 2, 3, 0).reshape(n_filter, -1)
         dW = dout_reshaped @ X_col.T
         dW = dW.reshape(W.shape)
-
         W_reshape = W.reshape(n_filter, -1)
-        dX_col = W_reshape.T @ dout_reshaped
+        dX_col = W_reshape.T.dot(dout_reshaped)
         dX = col2im_indices(dX_col, X.shape, h_filter, w_filter, stride=1)
         self.cache = [dW[:, :, ::-1, ::-1], db.flatten()]
         return dX
@@ -1085,18 +1080,15 @@ class MaxPoolingLayer(Layer):
         Returns:
             outputs: Array of layer outputs of shape (batch_size, output_dim).
         """
-        X = inputs
         n, d, h, w = inputs.shape
-        X_reshaped = X.reshape(n * d, 1, h, w)
-        size = self.pool_size
-        h_out = h // size
-        w_out = w // size
-        X_col = im2col_indices(X_reshaped, size, size, stride=size)
-        max_idx = np.argmax(X_col, axis=0)
-        out = X_col[max_idx, range(max_idx.size)]
-        out = out.reshape(h_out, w_out, n, d)
-        out = out.transpose(2, 3, 0, 1)
-        self.cache = [X_col, max_idx, n, d, h, w, size]
+        h_output = h // self.pool_size
+        w_output = w // self.pool_size
+        inp = inputs.reshape(n * d, 1, h, w)
+        inputs_expanded = im2col_indices(inp, self.pool_size, self.pool_size, stride=self.pool_size)
+        max_idx = np.argmax(inputs_expanded, axis=0)
+        out = inputs_expanded[max_idx, range(max_idx.size)]
+        out = out.reshape(h_output, w_output, n, d).transpose(2, 3, 0, 1)
+        self.cache = [inputs_expanded, max_idx, n, d, h, w]
         return out
 
     def bprop(self, inputs, outputs, grads_wrt_outputs):
@@ -1114,12 +1106,13 @@ class MaxPoolingLayer(Layer):
             (batch_size, input_dim).
         """
         X = inputs
-        X_col, max_idx, n, d, h, w, size = self.cache
+        X_col, max_idx, n, d, h, w = self.cache
         dX_col = np.zeros_like(X_col)
         dout = grads_wrt_outputs
         dout_flat = dout.transpose(2, 3, 0, 1).ravel()
         dX_col[max_idx, range(max_idx.size)] = dout_flat
-        return col2im_indices(dX_col, (n * d, 1, h, w), size, size, stride=size).reshape(X.shape)
+        return col2im_indices(dX_col, (n * d, 1, h, w), self.pool_size, self.pool_size,
+                              stride=self.pool_size).reshape(X.shape)
 
     def __repr__(self):
         return 'MaxPoolingLayer(pool_size={0})'.format(self.pool_size)
