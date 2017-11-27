@@ -443,7 +443,7 @@ SGD			& 0.8485 	\\
 
 
 \subsection{Experiment result and analysis}
-The result is showed as Figure~\ref{fig:lr}. We run the experiment on baseline model and the only variable is setting of learning rule. The learning rule we used is Gradient Descend (learning rate: 0.1), Adam (learning rate 0.001), RMSProp (learning rate 0.001).
+The result is showed as Figure~\ref{fig:lr}. We run the experiment on baseline model and the only variable is setting of learning rule. The learning rule we used is Gradient Descend (learning rate: 0.1), Adam (learning rate 0.001,$\beta_1$=0.9,$\beta_1$=0.999,$\epsilon=10^{-8} $), RMSProp (learning rate 0.001, $\beta_1$=0.9, $\epsilon=10^{-8} $).
 
  This result can show that in our EMNIST dataset,  Adam > RMSProp > SGD. Adam and RMSProp takes less epoch to converge. After 50 epochs, all the curves seems to have similar error and accuracy, that might because they reached a similar local optimum. RMSProp is better than Gradient descent, which proved that using only the sign of the gradient is a good trick for improving training process. Adam is slightly better than RMSProp, which might because the advantage of having momentum. Momentum can help better and quicker converge as Adam paper suggested.
 

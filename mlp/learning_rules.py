@@ -74,8 +74,7 @@ class GradientDescentLearningRule(object):
 
 
 class AdamLearningRule(GradientDescentLearningRule):
-    def __init__(self, learning_rate=1e-3, beta_1=0.9, beta_2=0.999,
-                 epsilon=1e-8):
+    def __init__(self, learning_rate=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-8):
         super(AdamLearningRule, self).__init__(learning_rate)
         self.beta_1 = beta_1
         self.beta_2 = beta_2

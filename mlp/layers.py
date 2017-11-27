@@ -365,14 +365,14 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
 
     def fprop(self, inputs, stochastic=True):
         """Forward propagates inputs through a layer."""
-        N, D = inputs.shape
-        xmu = inputs - 1. / N * np.sum(inputs, axis=0)
-        var = 1. / N * np.sum(xmu ** 2, axis=0)
-        sqrtvar = np.sqrt(var + self.epsilon)
-        ivar = 1. / sqrtvar
-        xhat = xmu * ivar
-        self.cache = (xhat, xmu, ivar, sqrtvar, var)
-        return self.gamma * xhat + self.beta
+        n, d = inputs.shape
+        x_mu = inputs - 1. / n * np.sum(inputs, axis=0)
+        var = 1. / n * np.sum(x_mu ** 2, axis=0)
+        sqrt_var = np.sqrt(var + self.epsilon)
+        i_var = 1. / sqrt_var
+        x_hat = x_mu * i_var
+        self.cache = (x_hat, x_mu, i_var, sqrt_var, var)
+        return self.gamma * x_hat + self.beta
 
     def bprop(self, inputs, outputs, grads_wrt_outputs):
         """Back propagates gradients through a layer.
@@ -391,14 +391,14 @@ class BatchNormalizationLayer(StochasticLayerWithParameters):
             Array of gradients with respect to the layer inputs of shape
             (batch_size, input_dim).
         """
-        xhat, xmu, ivar, sqrtvar, var = self.cache
-        N, D = grads_wrt_outputs.shape
+        x_hat, x_mu, i_var, sqrt_var, var = self.cache
+        n, d = grads_wrt_outputs.shape
         dxhat = grads_wrt_outputs * self.gamma
-        dxmu2 = 2 * xmu * 1. / N * np.ones((N, D)) * 0.5 * 1. / np.sqrt(var + self.epsilon) * -1. / (
-            sqrtvar ** 2) * np.sum(
-            dxhat * xmu, axis=0)
-        self.cache = [(np.sum(grads_wrt_outputs * xhat, axis=0)), (np.sum(grads_wrt_outputs, axis=0))]
-        return (dxhat * ivar + dxmu2) + 1. / N * np.ones((N, D)) * -1 * np.sum(dxhat * ivar + dxmu2, axis=0)
+        dxmu2 = 2 * x_mu * 1. / n * np.ones((n, d)) * 0.5 * 1. / np.sqrt(var + self.epsilon) * -1. / (
+            sqrt_var ** 2) * np.sum(
+            dxhat * x_mu, axis=0)
+        self.cache = [(np.sum(grads_wrt_outputs * x_hat, axis=0)), (np.sum(grads_wrt_outputs, axis=0))]
+        return (dxhat * i_var + dxmu2) + 1. / n * np.ones((n, d)) * -1 * np.sum(dxhat * i_var + dxmu2, axis=0)
 
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
         """Calculates gradients with respect to layer parameters.
@@ -566,7 +566,7 @@ class ConvolutionalLayer(LayerWithParameters):
         kernels_col = kernels.reshape(n_filters, -1)
         out = kernels_col.dot(inputs_col) + self.biases[:, np.newaxis]
         out = out.reshape(n_filters, h_out, w_out, n_x).transpose(3, 0, 1, 2)
-        self.cache = (inputs, kernels, self.biases, inputs_col)
+        self.cache = (kernels, inputs_col)
         return out
 
     def bprop(self, inputs, outputs, grads_wrt_outputs):
@@ -586,18 +586,17 @@ class ConvolutionalLayer(LayerWithParameters):
             Array of gradients with respect to the layer inputs of shape
             (batch_size, input_dim).
         """
-        X, W, b, X_col = self.cache
-        n_filter, d_filter, h_filter, w_filter = W.shape
-        db = np.sum(grads_wrt_outputs, axis=(0, 2, 3))
-        db = db.reshape(n_filter, -1)
+        kernels, inputs_col = self.cache
+        n_filter, d_filter, h_filter, w_filter = kernels.shape
+        db = np.sum(grads_wrt_outputs, axis=(0, 2, 3)).reshape(n_filter, -1)
         dout_reshaped = grads_wrt_outputs.transpose(1, 2, 3, 0).reshape(n_filter, -1)
-        dW = dout_reshaped @ X_col.T
-        dW = dW.reshape(W.shape)
-        W_reshape = W.reshape(n_filter, -1)
-        dX_col = W_reshape.T.dot(dout_reshaped)
-        dX = col2im_indices(dX_col, X.shape, h_filter, w_filter, stride=1)
-        self.cache = [dW[:, :, ::-1, ::-1], db.flatten()]
-        return dX
+        d_kernels = dout_reshaped.dot(inputs_col.T)
+        d_kernels = d_kernels.reshape(kernels.shape)
+        kernels_reshape = kernels.reshape(n_filter, -1)
+        d_inputs_col = kernels_reshape.T.dot(dout_reshaped)
+        d_inputs = col2im_indices(d_inputs_col, inputs.shape, h_filter, w_filter, stride=1)
+        self.cache = [d_kernels[:, :, ::-1, ::-1], db.flatten()]
+        return d_inputs
 
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
         """Calculates gradients with respect to layer parameters.
